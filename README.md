@@ -12,7 +12,7 @@ CB Inspector can function as a de-facto parent tenant, essentially bridging the 
 # Usage
 1. Clone this repository:
 ```
-❯ git clone <link>
+❯ git clone git@github.com:fish-not-phish/cb-inspector.git
 ```
 2. Create a json file with your expected tenant information. Example below:
 ```
