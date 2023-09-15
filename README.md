@@ -85,6 +85,17 @@ The output will include the following for each event found:
 ```
 Investigate will allow you to run a query as if you were inside the Carbon Black Cloud console. You will still need to escape special characters, including spaces as you would in the console.
 
+Example query:
+```
+process_product_name:the\ product\ name filemod_name:.zip 
+```
+
+Or, here is an example with a NOT.
+
+```
+process_product_name:the\ product\ name NOT filemod_name:.zip 
+```
+
 - Investigate across one tenant
     - Investigate on one device
         - Run a query and have results returned to your terminal
