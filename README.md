@@ -90,7 +90,7 @@ Example query:
 process_product_name:the\ product\ name filemod_name:.zip 
 ```
 
-Or, here is an example with a NOT.
+Or, here is an example with a NOT operator
 
 ```
 process_product_name:the\ product\ name NOT filemod_name:.zip 
