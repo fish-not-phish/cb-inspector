@@ -73,7 +73,7 @@ This would be useful for creating mass detections over all tenant environments a
 
 Detections', 'Collisions', f'collisions_all_{current_datetime}.txt'
 
-Running a Detection query will automatically create a subfolder within `Detections` called `Created` and `Collisions`. A file will be written with the output results called `created_<report_name>_<current_datetime>.txt` if a watchlist/report was created. If a report was not created, a file will be written with the output of the collisions called `collisions_all_<current_datetime>.txt`.
+Running a Detection query will automatically create two subfolders within `Detections` called `Created` and `Collisions`. A file will be written with the output results called `created_<report_name>_<current_datetime>.txt` if a watchlist/report was created. If a report was not created, a file will be written with the output of the collisions called `collisions_all_<current_datetime>.txt`.
 
 The output will include the following for each event found:
 - Tenant Name
