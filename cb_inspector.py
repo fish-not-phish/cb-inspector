@@ -6,10 +6,15 @@ import os
 from datetime import datetime
 import json
 import sys
+from selenium import webdriver
+from bs4 import BeautifulSoup
+from time import sleep
+import re
 
 os.makedirs('Investigations', exist_ok=True)
 os.makedirs('Detections', exist_ok=True)
 os.makedirs('Watchlist Hits', exist_ok=True)
+os.makedirs('Outdated Sensors', exist_ok=True)
 
 class Color:
     RESET = '\033[0m'
@@ -649,6 +654,230 @@ def main():
                                             file.write("------------------------------------------------------------------\n") 
             else:
                 print(f"{Color.RED}Invalid number entered.{Color.RESET}")
+        elif action.lower() == "check sensors":
+            groups = {}
+            result_dict = {}
+            print("Pulling most recent sensor versions. Please wait...")
+            url = "https://docs.vmware.com/en/VMware-Carbon-Black-Cloud/index.html"
+            options = webdriver.ChromeOptions()
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--log-level=3')
+            options.add_experimental_option("excludeSwitches", ["enable-logging"])
+            options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            driver = webdriver.Chrome(options=options)
+            try:
+                driver.get(url)
+                sleep(10)
+                page_source = driver.page_source
+                soup = BeautifulSoup(page_source, 'html.parser')
+                elements = soup.find_all(class_="noLabel")
+                no_label_contents = [
+                    element.get_text(separator=' ', strip=True)
+                    for element in elements
+                    if "Release Notes" in element.get_text()
+                    and "DEPRECATED" not in element.get_text()
+                    and "Container" not in element.get_text()
+                ]
+                groups = {
+                    "VMware Carbon Black Cloud Windows Sensor": [],
+                    "VMware Carbon Black Cloud Linux Sensor": [],
+                    "VMware Carbon Black Cloud macOS Sensor": []
+                }
+                for content in no_label_contents:
+                    version_number = re.search(r'(\d+\.\d+\.\d+\.\d+)', content)
+                    if version_number:
+                        version_number = version_number[0]
+                        for key in groups.keys():
+                            if key in content:
+                                groups[key].append(version_number)
+                                break
+                print(groups)
+            except Exception as e:
+                print(f"An error occurred: {e}")
+            finally:
+                driver.quit()
+            scope = input("Is this investigate query for:\n1. One tenant\n2. All tenants\nEnter scope: ")
+            if scope == "1":
+                tenant_code = input("Enter the tenant code: ")
+                tenant_code = tenant_code.upper()
+                cb = CBCloudAPI(profile=tenant_code)
+                w_w_c = 0
+                w_w_n_u = 0
+                w_s_c = 0
+                w_s_n_u = 0
+                m_c = 0
+                m_n_u = 0
+                query = cb.select(Device).all()
+                result_dict[tenant_code] = []
+                for device in query:
+                    os_version_lower = device.os_version.lower()
+                    os_lower = device.os.lower()
+                    sensor_version = device.sensor_version
+                    if "windows server" in os_version_lower or "server 2012 r2" in os_version_lower:
+                        w_s_c += 1
+                        group = groups["VMware Carbon Black Cloud Windows Sensor"]
+                        if sensor_version not in group[:3]:
+                            print(f"{device.os_version} with Device Name: {device.name} is out of date.")
+                            print(f"Current sensor version: {sensor_version}")
+                            print(f"----------------------------------------")
+                            w_s_n_u += 1
+                            result_info = {
+                                "Device OS Version": device.os_version,
+                                "Device Name": device.name,
+                                "Sensor Version": sensor_version
+                            }
+
+                            result_dict[tenant_code].append(result_info)
+                    # elif "linux" in os_lower:
+                    #     group = groups["VMware Carbon Black Cloud Linux Sensor"]
+                    #     if sensor_version not in group[:3]:
+                    #         print(f"{os_type} with Device Name: {device.name} is out of date.")
+                    #         print(f"Current sensor version: {sensor_version}")
+                    #         print(f"----------------------------------------")
+                    elif "mac" in os_version_lower:
+                        m_c += 1
+                        group = groups["VMware Carbon Black Cloud macOS Sensor"]
+                        if sensor_version not in group[:3]:
+                            print(f"{device.os_version} with Device Name: {device.name} is out of date.")
+                            print(f"Current sensor version: {sensor_version}")
+                            print(f"----------------------------------------")
+                            m_n_u += 1
+                            result_info = {
+                                "Device OS Version": device.os_version,
+                                "Device Name": device.name,
+                                "Sensor Version": sensor_version
+                            }
+
+                            result_dict[tenant_code].append(result_info)
+                    elif "windows 10" in os_version_lower or "windows 11" in os_version_lower or "windows 7" in os_version_lower:
+                        w_w_c += 1
+                        group = groups["VMware Carbon Black Cloud Windows Sensor"]
+                        if sensor_version not in group[:3]:
+                            print(f"{device.os_version} with Device Name: {device.name} is out of date.")
+                            print(f"Current sensor version: {sensor_version}")
+                            print(f"----------------------------------------")
+                            w_w_n_u += 1
+                            result_info = {
+                                "Device OS Version": device.os_version,
+                                "Device Name": device.name,
+                                "Sensor Version": sensor_version
+                            }
+
+                            result_dict[tenant_code].append(result_info)
+                print(f"Windows Workstations Out of Date: {w_w_n_u}/{w_w_c}")
+                print(f"Mac Machines Out of Date: {m_n_u}/{m_c}")
+                print(f"Windows Servers Out of Date: {w_s_n_u}/{w_s_c}")
+                print(f"All Devices Out of Date: {w_w_n_u + m_n_u + w_s_n_u}/{w_w_c + m_c + w_s_c}")
+                if result_dict:
+                    os.makedirs(os.path.join('Outdated Sensors', 'Results'), exist_ok=True)
+                    current_datetime = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                    with open(os.path.join('Outdated Sensors', 'Results', f'results_{tenant_code}_{current_datetime}.txt'), 'w') as file:
+                        file.write(f"Tenant: {tenant_code}\n")
+                        file.write(f"Windows Workstations Out of Date: {w_w_n_u}/{w_w_c}\n")
+                        file.write(f"Mac Machines Out of Date: {m_n_u}/{m_c}\n")
+                        file.write(f"Windows Servers Out of Date: {w_s_n_u}/{w_s_c}\n")
+                        file.write(f"All Devices Out of Date: {w_w_n_u + m_n_u + w_s_n_u}/{w_w_c + m_c + w_s_c}")
+                        file.write(f"Date/Time: {current_datetime}\n")
+                        file.write("------------------------------------------------------------------\n") 
+                        for tenant, devices in result_dict.items():
+                            for device in devices:
+                                file.write(f"Device OS Version: {device['Device OS Version']}\n")
+                                file.write(f"Device Name: {device['Device Name']}\n")
+                                file.write(f"Sensor Version: {device['Sensor Version']}\n")
+                                file.write("------------------------------------------------------------------\n") 
+            elif scope == "2":
+                if global_list is None:
+                    file_path = input('Please input the file that your tenant list is stored: ')
+                    
+                    try:
+                        with open(file_path, 'r') as file:
+                            tenant_list = json.load(file)
+                    except FileExistsError:
+                        print("File not found.")
+                    except json.JSONDecodeError:
+                        print("Error decoding file.")
+                else:
+                    tenant_list = global_list
+
+                for tenant in tenant_list:
+                    cb = CBCloudAPI(profile=tenant)
+                    w_w_c = 0
+                    w_w_n_u = 0
+                    w_s_c = 0
+                    w_s_n_u = 0
+                    m_c = 0
+                    m_n_u = 0
+                    query = cb.select(Device).all()
+                    result_dict[tenant] = result_dict.get(tenant, [])
+                    for device in query:
+                        os_version_lower = device.os_version.lower()
+                        os_lower = device.os.lower()
+                        sensor_version = device.sensor_version
+                        if "windows server" in os_version_lower or "server 2012 r2" in os_version_lower:
+                            w_s_c += 1
+                            group = groups["VMware Carbon Black Cloud Windows Sensor"]
+                            if sensor_version not in group[:3]:
+                                w_s_n_u += 1
+
+                                result_info = {
+                                    "Device OS Version": device.os_version,
+                                    "Device Name": device.name,
+                                    "Sensor Version": sensor_version
+                                }
+
+                                result_dict[tenant].append(result_info)
+                        # elif "linux" in os_lower:
+                        #     group = groups["VMware Carbon Black Cloud Linux Sensor"]
+                        #     if sensor_version not in group[:3]:
+                        #         print(f"{os_type} with Device Name: {device.name} is out of date.")
+                        #         print(f"Current sensor version: {sensor_version}")
+                        #         print(f"----------------------------------------")
+                        elif "mac" in os_version_lower:
+                            m_c += 1
+                            group = groups["VMware Carbon Black Cloud macOS Sensor"]
+                            if sensor_version not in group[:3]:
+                                m_n_u += 1
+
+                                result_info = {
+                                    "Device OS Version": device.os_version,
+                                    "Device Name": device.name,
+                                    "Sensor Version": sensor_version
+                                }
+
+                                result_dict[tenant].append(result_info)
+                        elif "windows 10" in os_version_lower or "windows 11" in os_version_lower or "windows 7" in os_version_lower:
+                            w_w_c += 1
+                            group = groups["VMware Carbon Black Cloud Windows Sensor"]
+                            if sensor_version not in group[:3]:
+                                w_w_n_u += 1
+                                
+                                result_info = {
+                                    "Device OS Version": device.os_version,
+                                    "Device Name": device.name,
+                                    "Sensor Version": sensor_version
+                                }
+
+                                result_dict[tenant].append(result_info)
+                    print(f"Tenant: {tenant}")
+                    print(f"Windows Workstations Out of Date: {w_w_n_u}/{w_w_c}")
+                    print(f"Mac Machines Out of Date: {m_n_u}/{m_c}")
+                    print(f"Windows Servers Out of Date: {w_s_n_u}/{w_s_c}")
+                    print(f"All Devices Out of Date: {w_w_n_u + m_n_u + w_s_n_u}/{w_w_c + m_c + w_s_c}")
+                    print("------------------------------------------------------------------") 
+                if result_dict:
+                    os.makedirs(os.path.join('Outdated Sensors', 'Results'), exist_ok=True)
+                    current_datetime = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                    with open(os.path.join('Outdated Sensors', 'Results', f'results_all_{current_datetime}.txt'), 'w') as file:
+                        file.write(f"Date/Time: {current_datetime}\n")
+                        file.write("------------------------------------------------------------------\n") 
+                        for tenant, devices in result_dict.items():
+                            for device in devices:
+                                file.write(f"tenant: {tenant}\n")
+                                file.write(f"Device OS Version: {device['Device OS Version']}\n")
+                                file.write(f"Device Name: {device['Device Name']}\n")
+                                file.write(f"Sensor Version: {device['Sensor Version']}\n")
+                                file.write("------------------------------------------------------------------\n")
         elif action.lower() == "quit":
             break
         elif action.lower() == "help":
