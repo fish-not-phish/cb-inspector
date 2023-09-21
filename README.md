@@ -42,9 +42,9 @@ For more information on how to properly set up your `credentials.cbc` file, plea
 
 Ensure the parent folder and `credentials.cbc` both have the correct permissions set.
 
-4. Install the Carbon Black through pip:
+4. Install the requirements using pip:
 ```
-❯ pip install carbon-black-cloud-sdk
+❯ pip install -r requirements.txt
 ```
 5. Run the script:
 ```
@@ -57,6 +57,7 @@ Three folders will be created within your current working directory:
 - Investigations
 - Detections
 - Watchlist Hits
+- Outdated Sensors
 
 ### Detections
 ```
@@ -138,3 +139,24 @@ The output will include the following for each event found:
 - Report Title 
 - Report ID
 - Alert Count
+
+### Outdated Sensors
+```
+❯ check sensors
+```
+Check Sensors is responsible for returning all devices that are more than 3 versions behind the newest sensors version for the respective Operating System. It is very easy to fall behind in versions as they become available quickly. This provides a solution to go through the entire environment, whether one tenant or all tenants. Currently, this does not support Linux devices as I was having trouble scraping the Linux versions from the Carbon Black documents. I will come out with a solution in the near future so Linux can be included.
+
+- Query outdated sensors for one tenant
+- Query outdated sensors for all tenants
+
+Running a Check Sensors query will automatically create one subfolder within `Outdated Sensors` called `Results`. A file will be written with the output results called `results_<tenant_code>_<current_datetime>.txt` if one tenant is queried. If all tenants are queried, a file will be written with the results called `results_all_<current_datetime>.txt`.
+
+The output will include the following for each event found:
+- Tenant Name
+- Device OS Version 
+- Device Name
+- Sensor Version
+
+## Future Updates
+I am currently developing a way to update all outdated sensors by empowering the user to select a group of devices (by Operating System) to update. The user will have the ability to choose one of the last 3 sensor versions so that they may avoid any potential compatability concerns with the newest sensor version.
+
