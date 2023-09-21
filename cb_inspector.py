@@ -75,7 +75,7 @@ def global_tenant_list(path):
 
 def main():
     global_list = None
-    print(display_banner("v1.0"))
+    print(display_banner("v1.1"))
     create_global_list = input("Would you like to use a global tenant list or enter a list for every operation performed?\n1. Global List\n2. Enter a list for every operation\n Enter a number: ")
     if create_global_list == "1":
         path = input("Please enter your tenant list file path: ")
