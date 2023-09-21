@@ -60,6 +60,7 @@ def help_manual():
                                             {Color.MAGENTA}Returns Hits on Custom Investigate Query
                                             If No Hits, Then Create Watchlist/Report{Color.CYAN}
     watchlist hits                      --> Check All Hits Against Specific Watchlist/Report 
+    check sensors                       --> Check If Sensors Are Out of Date
     help                                --> Display Help Menu
     \n{Color.RESET}'''
 
