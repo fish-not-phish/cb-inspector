@@ -693,7 +693,6 @@ def main():
                             if key in content:
                                 groups[key].append(version_number)
                                 break
-                print(groups)
             except Exception as e:
                 print(f"An error occurred: {e}")
             finally:
